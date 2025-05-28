@@ -32,14 +32,21 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
     echoCancellation: true,
   })
   const [isTestingMic, setIsTestingMic] = useState(false)
+  const [isLoadingDevices, setIsLoadingDevices] = useState(true)
+  const [deviceError, setDeviceError] = useState<string>("")
 
   useEffect(() => {
     const getDevices = async () => {
       try {
+        setIsLoadingDevices(true)
+        setDeviceError("")
         const deviceList = await navigator.mediaDevices.enumerateDevices()
         setDevices(deviceList)
       } catch (error) {
         console.error("Error getting devices:", error)
+        setDeviceError("Failed to access audio devices. Please check permissions.")
+      } finally {
+        setIsLoadingDevices(false)
       }
     }
 
@@ -206,15 +213,22 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {deviceError && (
+          <div className="text-sm text-red-400 bg-red-900/20 p-3 rounded border border-red-800">
+            {deviceError}
+          </div>
+        )}
+        
         {/* Input Device */}
         <div className="space-y-2">
           <Label className="text-gray-300">Microphone</Label>
           <Select
             value={settings.inputDevice}
             onValueChange={(value) => setSettings((prev) => ({ ...prev, inputDevice: value }))}
+            disabled={isLoadingDevices}
           >
             <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue placeholder="Select microphone" />
+              <SelectValue placeholder={isLoadingDevices ? "Loading devices..." : "Select microphone"} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
               <SelectItem value="default" className="text-white hover:bg-gray-600">
@@ -223,7 +237,7 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
               {inputDevices.map((device) => (
                 <SelectItem
                   key={device.deviceId}
-                  value={device.deviceId || `input-${Math.random().toString(36).substr(2, 9)}`}
+                  value={device.deviceId || `input-${Math.random().toString(36).substring(2, 11)}`}
                   className="text-white hover:bg-gray-600"
                 >
                   {device.label || `Microphone ${device.deviceId?.slice(0, 8) || "Unknown"}`}
@@ -239,9 +253,10 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
           <Select
             value={settings.outputDevice}
             onValueChange={(value) => setSettings((prev) => ({ ...prev, outputDevice: value }))}
+            disabled={isLoadingDevices}
           >
             <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue placeholder="Select speakers" />
+              <SelectValue placeholder={isLoadingDevices ? "Loading devices..." : "Select speakers"} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
               <SelectItem value="default" className="text-white hover:bg-gray-600">
@@ -250,7 +265,7 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
               {outputDevices.map((device) => (
                 <SelectItem
                   key={device.deviceId}
-                  value={device.deviceId || `output-${Math.random().toString(36).substr(2, 9)}`}
+                  value={device.deviceId || `output-${Math.random().toString(36).substring(2, 11)}`}
                   className="text-white hover:bg-gray-600"
                 >
                   {device.label || `Speaker ${device.deviceId?.slice(0, 8) || "Unknown"}`}
@@ -295,12 +310,12 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
         <div className="space-y-3">
           <Button
             onClick={testMicrophone}
-            disabled={isTestingMic}
+            disabled={isTestingMic || isLoadingDevices}
             variant="outline"
-            className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+            className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
           >
             <TestTube className="w-4 h-4 mr-2" />
-            {isTestingMic ? "Testing... (5s)" : "Test Microphone"}
+            {isTestingMic ? "Testing... (5s)" : isLoadingDevices ? "Loading..." : "Test Microphone"}
           </Button>
 
           {/* Waveform Canvas */}

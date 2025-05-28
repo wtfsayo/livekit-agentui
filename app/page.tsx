@@ -15,7 +15,7 @@ export default function VoiceChatPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [roomName, setRoomName] = useState("voice-agent-room")
   const [token, setToken] = useState("")
-  const [participantName, setParticipantName] = useState("user-" + Math.random().toString(36).substr(2, 9))
+  const [participantName, setParticipantName] = useState("user-" + Math.random().toString(36).substring(2, 11))
   const [isGeneratingToken, setIsGeneratingToken] = useState(false)
   const [error, setError] = useState("")
   const [showSettings, setShowSettings] = useState(false)
@@ -78,7 +78,13 @@ export default function VoiceChatPage() {
         </CardHeader>
         {showSettings && (
           <div className="space-y-4 mb-6 p-4">
-            <QuickStartGuide currentStep={testPassed ? 2 : 1} />
+            <QuickStartGuide 
+              currentStep={
+                isConnected ? 4 : 
+                testPassed ? 3 : 
+                showSettings ? 2 : 1
+              } 
+            />
             <ConnectionTest onTestComplete={setTestPassed} />
             <VoiceSettings />
           </div>

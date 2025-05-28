@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Mic, MicOff, PhoneOff, Volume2, VolumeX, User, Bot, Loader2 } from "lucide-react"
 import AgentStatusIndicator from "@/components/agent-status-indicator"
 import ConversationTranscript from "@/components/conversation-transcript"
+import AudioVisualizer from "@/components/audio-visualizer"
 
 interface VoiceChatRoomProps {
   token: string
@@ -27,25 +28,52 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
   const [isMuted, setIsMuted] = useState(false)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
 
+  // Sync mute state with actual microphone state
+  useEffect(() => {
+    if (localParticipant) {
+      const updateMuteState = () => {
+        const micTrack = localParticipant.getTrackPublication(Track.Source.Microphone)
+        if (micTrack) {
+          setIsMuted(micTrack.isMuted)
+        }
+      }
+
+      // Initial sync
+      updateMuteState()
+
+      // Listen for track mute/unmute events
+      localParticipant.on('trackMuted', updateMuteState)
+      localParticipant.on('trackUnmuted', updateMuteState)
+
+      return () => {
+        localParticipant.off('trackMuted', updateMuteState)
+        localParticipant.off('trackUnmuted', updateMuteState)
+      }
+    }
+  }, [localParticipant])
+
   const toggleMute = async () => {
     try {
-      await localParticipant.setMicrophoneEnabled(!isMuted)
-      setIsMuted(!isMuted)
+      // When muted, enable microphone (unmute)
+      // When not muted, disable microphone (mute)
+      const shouldEnable = isMuted
+      await localParticipant.setMicrophoneEnabled(shouldEnable)
+      // Don't manually set state here - let the event listener handle it
+      // setIsMuted(!shouldEnable)
     } catch (error) {
       console.error("Failed to toggle microphone:", error)
+      // On error, revert the state
+      setIsMuted(isMuted)
     }
   }
 
   const toggleAudio = async () => {
     try {
-      // Use the correct method for enabling/disabling audio playback
-      if (localParticipant.audioTrackPublications.size > 0) {
-        const audioPublication = Array.from(localParticipant.audioTrackPublications.values())[0]
-        if (audioPublication?.track) {
-          audioPublication.track.enabled = !isAudioEnabled
-          setIsAudioEnabled(!isAudioEnabled)
-        }
-      }
+      // Toggle audio output (speakers)
+      const shouldEnable = !isAudioEnabled
+      // This would typically control the audio output/speakers
+      // For now, we'll just update the state
+      setIsAudioEnabled(shouldEnable)
     } catch (error) {
       console.error("Failed to toggle audio:", error)
     }
@@ -137,12 +165,29 @@ function ParticipantsList() {
 
 function VoiceChatContent({ onDisconnect }: { onDisconnect: () => void }) {
   const { state } = useVoiceAssistant()
+  const tracks = useTracks([Track.Source.Microphone], { onlySubscribed: true })
+  
+  // Get the first available audio track for visualization
+  const activeAudioTrack = tracks.find(track => track.publication?.track)?.publication?.track
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="space-y-6">
         <AgentStatusIndicator isConnected={true} agentState={state} />
         <VoiceAssistantControls onDisconnect={onDisconnect} />
+        {/* Audio Visualizer */}
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg text-white">Audio Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AudioVisualizer 
+              audioStream={activeAudioTrack?.mediaStream} 
+              isActive={tracks.length > 0}
+              className="rounded-lg"
+            />
+          </CardContent>
+        </Card>
       </div>
       <div>
         <ParticipantsList />

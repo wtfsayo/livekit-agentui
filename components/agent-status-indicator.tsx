@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Bot, Wifi, WifiOff, AlertCircle } from "lucide-react"
+import { useConnectionState, useRoomInfo } from "@livekit/components-react"
+import { ConnectionQuality } from "livekit-client"
 
 interface AgentStatusIndicatorProps {
   isConnected: boolean
@@ -11,33 +13,41 @@ interface AgentStatusIndicatorProps {
 }
 
 export default function AgentStatusIndicator({ isConnected, agentState }: AgentStatusIndicatorProps) {
-  const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "poor" | "unknown">("unknown")
-
-  useEffect(() => {
-    // Simulate connection quality monitoring
-    const interval = setInterval(() => {
-      if (isConnected) {
-        const qualities = ["excellent", "good", "poor"] as const
-        const randomQuality = qualities[Math.floor(Math.random() * qualities.length)]
-        setConnectionQuality(randomQuality)
-      } else {
-        setConnectionQuality("unknown")
-      }
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [isConnected])
+  const connectionState = useConnectionState()
+  const roomInfo = useRoomInfo()
+  
+  const getQualityText = () => {
+    if (!isConnected) return "unknown"
+    
+    // Use connection state to determine quality
+    switch (connectionState) {
+      case "connected":
+        return "excellent"
+      case "connecting":
+        return "good"
+      case "reconnecting":
+        return "poor"
+      case "disconnected":
+        return "lost"
+      default:
+        return "unknown"
+    }
+  }
+  
+  const qualityText = getQualityText()
 
   const getConnectionIcon = () => {
     if (!isConnected) return <WifiOff className="w-4 h-4 text-red-400" />
 
-    switch (connectionQuality) {
+    switch (qualityText) {
       case "excellent":
         return <Wifi className="w-4 h-4 text-green-400" />
       case "good":
         return <Wifi className="w-4 h-4 text-yellow-400" />
       case "poor":
-        return <AlertCircle className="w-4 h-4 text-red-400" />
+        return <AlertCircle className="w-4 h-4 text-orange-400" />
+      case "lost":
+        return <WifiOff className="w-4 h-4 text-red-400" />
       default:
         return <Wifi className="w-4 h-4 text-gray-400" />
     }
@@ -45,7 +55,7 @@ export default function AgentStatusIndicator({ isConnected, agentState }: AgentS
 
   const getConnectionText = () => {
     if (!isConnected) return "Disconnected"
-    return `${connectionQuality.charAt(0).toUpperCase() + connectionQuality.slice(1)} Connection`
+    return `${qualityText.charAt(0).toUpperCase() + qualityText.slice(1)} Connection`
   }
 
   return (
@@ -80,6 +90,15 @@ export default function AgentStatusIndicator({ isConnected, agentState }: AgentS
             <span className="text-sm font-medium text-gray-300">State</span>
             <Badge variant="outline" className="border-gray-600 text-gray-300">
               {agentState}
+            </Badge>
+          </div>
+        )}
+
+        {isConnected && roomInfo && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-300">Room</span>
+            <Badge variant="outline" className="border-gray-600 text-gray-300 font-mono text-xs">
+              {roomInfo.name}
             </Badge>
           </div>
         )}
