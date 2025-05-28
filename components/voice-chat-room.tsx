@@ -11,7 +11,9 @@ import {
 import { Track } from "livekit-client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, PhoneOff, Volume2, VolumeX, User, Bot, Loader2 } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Mic, MicOff, PhoneOff, Volume2, VolumeX, User, Bot, Loader2, Settings } from "lucide-react"
 import AgentStatusIndicator from "@/components/agent-status-indicator"
 import ConversationTranscript from "@/components/conversation-transcript"
 import AudioVisualizer from "@/components/audio-visualizer"
@@ -27,6 +29,31 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
   const { localParticipant } = useLocalParticipant()
   const [isMuted, setIsMuted] = useState(false)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedInputDevice, setSelectedInputDevice] = useState<string>("default")
+  const [selectedOutputDevice, setSelectedOutputDevice] = useState<string>("default")
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false)
+  const [isSwitchingDevice, setIsSwitchingDevice] = useState(false)
+
+  // Load available devices
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        const deviceList = await navigator.mediaDevices.enumerateDevices()
+        setDevices(deviceList)
+      } catch (error) {
+        console.error("Error getting devices:", error)
+      }
+    }
+
+    getDevices()
+    
+    // Listen for device changes
+    navigator.mediaDevices.addEventListener('devicechange', getDevices)
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', getDevices)
+    }
+  }, [])
 
   // Sync mute state with actual microphone state
   useEffect(() => {
@@ -79,6 +106,50 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
     }
   }
 
+  const switchInputDevice = async (deviceId: string) => {
+    if (isSwitchingDevice) return // Prevent multiple simultaneous switches
+    
+    try {
+      setIsSwitchingDevice(true)
+      setSelectedInputDevice(deviceId)
+      
+      // Get current mute state
+      const currentlyMuted = isMuted
+      
+      // Switch the microphone device by first disabling then re-enabling with new device
+      await localParticipant.setMicrophoneEnabled(false)
+      
+      // Small delay to ensure cleanup
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Re-enable with new device constraints
+      const constraints = deviceId !== "default" ? { deviceId: { exact: deviceId } } : undefined
+      await localParticipant.setMicrophoneEnabled(!currentlyMuted, constraints)
+      
+    } catch (error) {
+      console.error("Failed to switch input device:", error)
+      // Revert selection on error
+      setSelectedInputDevice(selectedInputDevice)
+    } finally {
+      setIsSwitchingDevice(false)
+    }
+  }
+
+  const switchOutputDevice = async (deviceId: string) => {
+    try {
+      setSelectedOutputDevice(deviceId)
+      // Note: Setting output device is limited in web browsers
+      // This is more for UI feedback and future enhancement
+      console.log("Selected output device:", deviceId)
+    } catch (error) {
+      console.error("Failed to switch output device:", error)
+    }
+  }
+
+  // Helper functions for device lists
+  const inputDevices = devices.filter(device => device.kind === 'audioinput' && device.deviceId)
+  const outputDevices = devices.filter(device => device.kind === 'audiooutput' && device.deviceId)
+
   return (
     <Card className="bg-gray-800 border-gray-700">
       <CardHeader className="pb-3">
@@ -88,31 +159,102 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
-          <Button
-            variant={isMuted ? "destructive" : "outline"}
-            size="lg"
-            onClick={toggleMute}
-            className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
-          >
-            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            <span className="text-xs">{isMuted ? "Unmute" : "Mute"}</span>
-          </Button>
+        <div className="space-y-4">
+          {/* Main Controls */}
+          <div className="grid grid-cols-4 gap-3">
+            <Button
+              variant={isMuted ? "destructive" : "outline"}
+              size="lg"
+              onClick={toggleMute}
+              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+            >
+              {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              <span className="text-xs">{isMuted ? "Unmute" : "Mute"}</span>
+            </Button>
 
-          <Button
-            variant={isAudioEnabled ? "outline" : "destructive"}
-            size="lg"
-            onClick={toggleAudio}
-            className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
-          >
-            {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-            <span className="text-xs">{isAudioEnabled ? "Audio On" : "Audio Off"}</span>
-          </Button>
+            <Button
+              variant={isAudioEnabled ? "outline" : "destructive"}
+              size="lg"
+              onClick={toggleAudio}
+              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+            >
+              {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              <span className="text-xs">{isAudioEnabled ? "Audio On" : "Audio Off"}</span>
+            </Button>
 
-          <Button variant="destructive" size="lg" onClick={onDisconnect} className="flex flex-col gap-1 h-auto py-3">
-            <PhoneOff className="w-5 h-5" />
-            <span className="text-xs">Disconnect</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setShowDeviceSettings(!showDeviceSettings)}
+              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="text-xs">Devices</span>
+            </Button>
+
+            <Button variant="destructive" size="lg" onClick={onDisconnect} className="flex flex-col gap-1 h-auto py-3">
+              <PhoneOff className="w-5 h-5" />
+              <span className="text-xs">Disconnect</span>
+            </Button>
+          </div>
+
+          {/* Device Settings */}
+          {showDeviceSettings && (
+            <div className="space-y-3 p-3 bg-gray-700 rounded-lg">
+              <h4 className="text-sm font-medium text-white">Audio Devices</h4>
+              
+              {/* Input Device Selection */}
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-300 flex items-center gap-2">
+                  Microphone
+                  {isSwitchingDevice && <Loader2 className="w-3 h-3 animate-spin" />}
+                </Label>
+                <Select value={selectedInputDevice} onValueChange={switchInputDevice} disabled={isSwitchingDevice}>
+                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white h-8 text-xs disabled:opacity-50">
+                    <SelectValue placeholder="Select microphone" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-600 border-gray-500">
+                    <SelectItem value="default" className="text-white hover:bg-gray-500">
+                      Default Microphone
+                    </SelectItem>
+                    {inputDevices.map((device) => (
+                      <SelectItem
+                        key={device.deviceId}
+                        value={device.deviceId}
+                        className="text-white hover:bg-gray-500"
+                      >
+                        {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Output Device Selection */}
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-300">Speakers</Label>
+                <Select value={selectedOutputDevice} onValueChange={switchOutputDevice}>
+                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white h-8 text-xs">
+                    <SelectValue placeholder="Select speakers" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-600 border-gray-500">
+                    <SelectItem value="default" className="text-white hover:bg-gray-500">
+                      Default Speakers
+                    </SelectItem>
+                    {outputDevices.map((device) => (
+                      <SelectItem
+                        key={device.deviceId}
+                        value={device.deviceId}
+                        className="text-white hover:bg-gray-500"
+                      >
+                        {device.label || `Speaker ${device.deviceId.slice(0, 8)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

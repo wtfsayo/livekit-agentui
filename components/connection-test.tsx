@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Loader2, Wifi, Mic, Volume2 } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { CheckCircle, XCircle, Loader2, Wifi, Mic, Volume2, Settings } from "lucide-react"
 
 interface ConnectionTestProps {
   onTestComplete: (success: boolean) => void
@@ -17,63 +19,151 @@ export default function ConnectionTest({ onTestComplete }: ConnectionTestProps) 
     network: { status: "pending", message: "" },
   })
   const [isRunning, setIsRunning] = useState(false)
+  const [currentTest, setCurrentTest] = useState<string>("")
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedInputDevice, setSelectedInputDevice] = useState<string>("default")
+  const [selectedOutputDevice, setSelectedOutputDevice] = useState<string>("default")
+  const [isLoadingDevices, setIsLoadingDevices] = useState(true)
+  const [showDeviceSelection, setShowDeviceSelection] = useState(false)
+
+  // Load available devices
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        setIsLoadingDevices(true)
+        const deviceList = await navigator.mediaDevices.enumerateDevices()
+        setDevices(deviceList)
+      } catch (error) {
+        console.error("Error getting devices:", error)
+      } finally {
+        setIsLoadingDevices(false)
+      }
+    }
+
+    getDevices()
+  }, [])
 
   const runTests = async () => {
     setIsRunning(true)
+    let testResults = {
+      microphone: { status: "pending", message: "" },
+      speakers: { status: "pending", message: "" },
+      network: { status: "pending", message: "" },
+    }
 
-    // Test microphone access
+    // Test microphone access and input detection
+    setCurrentTest("microphone")
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const audioConstraints = {
+        audio: selectedInputDevice !== "default" ? { deviceId: selectedInputDevice } : true
+      }
+      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints)
+      
+      // Update UI to show we're listening
       setTests((prev) => ({
         ...prev,
-        microphone: { status: "success", message: "Microphone access granted" },
+        microphone: { status: "running", message: "Listening for input... (speak now)" },
       }))
+      
+      // Test for actual microphone input
+      const audioContext = new AudioContext()
+      const analyser = audioContext.createAnalyser()
+      const source = audioContext.createMediaStreamSource(stream)
+      
+      // Configure analyzer for better sensitivity
+      analyser.fftSize = 512
+      analyser.smoothingTimeConstant = 0.2
+      source.connect(analyser)
+
+      // Check for audio input over a short period
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      let hasInput = false
+      let maxLevel = 0
+      
+      // Wait 3 seconds and check for audio input
+      await new Promise((resolve) => {
+        let checkCount = 0
+        const maxChecks = 30 // Check 30 times over 3 seconds
+        
+        const checkAudio = () => {
+          analyser.getByteFrequencyData(dataArray)
+          // Check both average and peak levels
+          const sum = dataArray.reduce((a, b) => a + b)
+          const average = sum / dataArray.length
+          const peak = Math.max(...dataArray)
+          maxLevel = Math.max(maxLevel, peak)
+          
+          // More sensitive detection - check for any significant audio activity
+          if (average > 5 || peak > 15) { 
+            hasInput = true
+            resolve(true)
+            return
+          }
+          
+          checkCount++
+          if (checkCount < maxChecks) {
+            setTimeout(checkAudio, 100)
+          } else {
+            resolve(false)
+          }
+        }
+        
+        checkAudio()
+      })
+
+      testResults.microphone = hasInput
+        ? { status: "success", message: "Microphone input detected successfully" }
+        : { status: "success", message: "Microphone accessible (no input detected)" }
+
+      // Clean up
       stream.getTracks().forEach((track) => track.stop())
+      audioContext.close()
     } catch (error) {
-      setTests((prev) => ({
-        ...prev,
-        microphone: { status: "error", message: "Microphone access denied" },
-      }))
+      testResults.microphone = { status: "error", message: "Microphone access denied" }
     }
 
     // Test speakers (basic audio context)
+    setCurrentTest("speakers")
+    setTests((prev) => ({
+      ...prev,
+      speakers: { status: "running", message: "Testing audio output..." },
+    }))
+    
     try {
       const audioContext = new AudioContext()
       await audioContext.resume()
-      setTests((prev) => ({
-        ...prev,
-        speakers: { status: "success", message: "Audio output available" },
-      }))
+      testResults.speakers = { status: "success", message: "Audio output available" }
       audioContext.close()
     } catch (error) {
-      setTests((prev) => ({
-        ...prev,
-        speakers: { status: "error", message: "Audio output unavailable" },
-      }))
+      testResults.speakers = { status: "error", message: "Audio output unavailable" }
     }
 
     // Test network connectivity
+    setCurrentTest("network")
+    setTests((prev) => ({
+      ...prev,
+      network: { status: "running", message: "Testing network connection..." },
+    }))
+    
     try {
       const response = await fetch("/api/health", { method: "HEAD" })
       if (response.ok) {
-        setTests((prev) => ({
-          ...prev,
-          network: { status: "success", message: "Network connection stable" },
-        }))
+        testResults.network = { status: "success", message: "Network connection stable" }
       } else {
         throw new Error("Network test failed")
       }
     } catch (error) {
-      setTests((prev) => ({
-        ...prev,
-        network: { status: "error", message: "Network connection issues" },
-      }))
+      testResults.network = { status: "error", message: "Network connection issues" }
     }
 
+    setCurrentTest("")
+
+    // Update state with all results
+    setTests(testResults)
     setIsRunning(false)
 
     // Check if all tests passed
-    const allPassed = Object.values(tests).every((test) => test.status === "success")
+    const allPassed = Object.values(testResults).every((test) => test.status === "success")
     onTestComplete(allPassed)
   }
 
@@ -83,6 +173,8 @@ export default function ConnectionTest({ onTestComplete }: ConnectionTestProps) 
         return <CheckCircle className="w-5 h-5 text-green-400" />
       case "error":
         return <XCircle className="w-5 h-5 text-red-400" />
+      case "running":
+        return <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
       case "pending":
         return <div className="w-5 h-5 rounded-full border-2 border-gray-500" />
       default:
@@ -133,7 +225,7 @@ export default function ConnectionTest({ onTestComplete }: ConnectionTestProps) 
           {isRunning ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Running Tests...
+              {currentTest ? `Testing ${currentTest}...` : "Running Tests..."}
             </>
           ) : (
             "Run Connection Test"
