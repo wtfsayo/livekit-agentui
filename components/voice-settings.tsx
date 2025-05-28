@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { Settings, Mic, Volume2, TestTube } from "lucide-react"
+import { Settings, Mic, Volume2, TestTube, Loader2 } from "lucide-react"
+import AudioVisualizer from "@/components/audio-visualizer"
 
 interface VoiceSettingsProps {
   onSettingsChange?: (settings: VoiceSettings) => void
@@ -34,6 +35,13 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
   const [isTestingMic, setIsTestingMic] = useState(false)
   const [isLoadingDevices, setIsLoadingDevices] = useState(true)
   const [deviceError, setDeviceError] = useState<string>("")
+  const [micTestState, setMicTestState] = useState<'idle' | 'requesting' | 'listening' | 'success' | 'failed'>('idle')
+  const [hasDetectedAudio, setHasDetectedAudio] = useState(false)
+  
+  // Refs for cleanup
+  const streamRef = useRef<MediaStream | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const getDevices = async () => {
@@ -57,39 +65,84 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
     onSettingsChange?.(settings)
   }, [settings, onSettingsChange])
 
+  // No canvas initialization needed anymore
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupMicTest()
+    }
+  }, [])
+
+  // Simple audio detection for testing
+  const monitorAudioLevel = () => {
+    if (!streamRef.current || !audioContextRef.current) return
+
+    const analyser = audioContextRef.current.createAnalyser()
+    const source = audioContextRef.current.createMediaStreamSource(streamRef.current)
+    analyser.fftSize = 256
+    source.connect(analyser)
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    
+    const checkAudio = () => {
+      if (!streamRef.current?.active) return
+      
+      analyser.getByteFrequencyData(dataArray)
+      let sum = 0
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i]
+      }
+      const average = sum / dataArray.length
+      
+      if (average > 5) {
+        setHasDetectedAudio(true)
+      }
+      
+      if (streamRef.current?.active) {
+        requestAnimationFrame(checkAudio)
+      }
+    }
+    
+    checkAudio()
+  }
+
+  // Cleanup function
+  const cleanupMicTest = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+
+    // Reset states
+    setMicTestState('idle')
+    setHasDetectedAudio(false)
+  }
+
   const testMicrophone = async () => {
+    if (isTestingMic) {
+      // Stop the test
+      setIsTestingMic(false)
+      cleanupMicTest()
+      return
+    }
+    
     setIsTestingMic(true)
-
-    // Get canvas element first and set it up
-    const canvas = document.getElementById("mic-test-canvas") as HTMLCanvasElement
-    if (!canvas) {
-      console.error("Canvas not found")
-      setIsTestingMic(false)
-      return
-    }
-
-    const ctx = canvas.getContext("2d")
-    if (!ctx) {
-      console.error("Canvas context not found")
-      setIsTestingMic(false)
-      return
-    }
-
-    // Set canvas size explicitly
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width
-    canvas.height = rect.height
-
-    // Draw initial state
-    ctx.fillStyle = "#374151"
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = "#9ca3af"
-    ctx.font = "12px sans-serif"
-    ctx.textAlign = "center"
-    ctx.fillText("Initializing microphone...", canvas.width / 2, canvas.height / 2 + 4)
+    setMicTestState('requesting')
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Request microphone access
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
           deviceId: settings.inputDevice !== "default" ? settings.inputDevice : undefined,
           noiseSuppression: settings.noiseSuppression,
@@ -97,107 +150,39 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
         },
       })
 
-      // Create audio context and analyser for waveform
-      const audioContext = new AudioContext()
-
-      // Resume audio context if suspended
-      if (audioContext.state === "suspended") {
-        await audioContext.resume()
+      // Set up audio analysis (same approach as AudioVisualizer)
+      audioContextRef.current = new AudioContext()
+      if (audioContextRef.current.state === "suspended") {
+        await audioContextRef.current.resume()
       }
 
-      const analyser = audioContext.createAnalyser()
-      const source = audioContext.createMediaStreamSource(stream)
+      setMicTestState('listening')
 
-      analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.3
-      source.connect(analyser)
+      // Start audio monitoring for detection
+      monitorAudioLevel()
 
-      const bufferLength = analyser.frequencyBinCount
-      const dataArray = new Uint8Array(bufferLength)
-
-      let animationId: number
-      let isDrawing = true
-
-      const draw = () => {
-        if (!isDrawing || !isTestingMic) {
-          cancelAnimationFrame(animationId)
-          return
-        }
-
-        animationId = requestAnimationFrame(draw)
-
-        // Get frequency data
-        analyser.getByteFrequencyData(dataArray)
-
-        // Clear canvas with dark background
-        ctx.fillStyle = "#374151"
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-        // Calculate average volume for overall level
-        let sum = 0
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i]
-        }
-        const average = sum / bufferLength
-
-        // Draw waveform bars
-        const barCount = 32
-        const barWidth = canvas.width / barCount
-
-        for (let i = 0; i < barCount; i++) {
-          // Use frequency data with some smoothing
-          const dataIndex = Math.floor((i / barCount) * bufferLength)
-          const barHeight = (dataArray[dataIndex] / 255) * canvas.height * 0.8
-
-          // Create gradient for each bar
-          const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight)
-          gradient.addColorStop(0, "#3b82f6")
-          gradient.addColorStop(0.5, "#60a5fa")
-          gradient.addColorStop(1, "#93c5fd")
-
-          ctx.fillStyle = gradient
-          ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 1, barHeight)
-        }
-
-        // Draw volume level indicator
-        ctx.fillStyle = "#9ca3af"
-        ctx.font = "10px sans-serif"
-        ctx.textAlign = "right"
-        ctx.fillText(`Level: ${Math.round(average)}`, canvas.width - 5, 15)
-      }
-
-      // Start drawing
-      draw()
-
-      // Test for 5 seconds
-      setTimeout(() => {
-        isDrawing = false
+      // Complete test after 5 seconds
+      timeoutRef.current = setTimeout(() => {
         setIsTestingMic(false)
-        cancelAnimationFrame(animationId)
-        stream.getTracks().forEach((track) => track.stop())
-        audioContext.close()
-
-        // Clear canvas with dark background
-        ctx.fillStyle = "#374151"
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-        // Draw placeholder text
-        ctx.fillStyle = "#9ca3af"
-        ctx.font = "12px sans-serif"
-        ctx.textAlign = "center"
-        ctx.fillText("Click 'Test Microphone' to see audio waveform", canvas.width / 2, canvas.height / 2 + 4)
+        setMicTestState(hasDetectedAudio ? 'success' : 'failed')
+        cleanupMicTest()
+        
+        // Reset to idle after showing result
+        setTimeout(() => {
+          setMicTestState('idle')
+        }, 3000)
       }, 5000)
+
     } catch (error) {
       console.error("Microphone test failed:", error)
       setIsTestingMic(false)
-
-      // Show error on canvas
-      ctx.fillStyle = "#7f1d1d"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.fillStyle = "#f87171"
-      ctx.font = "12px sans-serif"
-      ctx.textAlign = "center"
-      ctx.fillText("Microphone access denied", canvas.width / 2, canvas.height / 2 + 4)
+      setMicTestState('failed')
+      cleanupMicTest()
+      
+      // Reset to idle after showing error
+      setTimeout(() => {
+        setMicTestState('idle')
+      }, 3000)
     }
   }
 
@@ -308,29 +293,60 @@ export default function VoiceSettings({ onSettingsChange }: VoiceSettingsProps) 
 
         {/* Test Microphone */}
         <div className="space-y-3">
-          <Button
-            onClick={testMicrophone}
-            disabled={isTestingMic || isLoadingDevices}
-            variant="outline"
-            className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
-          >
-            <TestTube className="w-4 h-4 mr-2" />
-            {isTestingMic ? "Testing... (5s)" : isLoadingDevices ? "Loading..." : "Test Microphone"}
-          </Button>
-
-          {/* Waveform Canvas */}
-          <div className="h-16 bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden relative">
-            <canvas
-              id="mic-test-canvas"
-              className="w-full h-full rounded-lg"
-              style={{ display: "block", width: "100%", height: "100%" }}
-            />
-            {!isTestingMic && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-gray-400 text-sm">Click 'Test Microphone' to see audio waveform</span>
+          {/* Status Message */}
+          <div className="text-center">
+            {micTestState === 'requesting' && (
+              <div className="flex items-center justify-center gap-2 text-blue-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Requesting microphone access...</span>
+              </div>
+            )}
+            {micTestState === 'listening' && (
+              <div className="text-blue-400">
+                <div className="text-sm font-medium">Speak now!</div>
+                <div className="text-xs text-gray-400">We're listening for your voice</div>
+              </div>
+            )}
+            {micTestState === 'success' && (
+              <div className="text-green-400">
+                <div className="text-sm font-medium">Perfect! We can hear you clearly</div>
+                <div className="text-xs text-gray-400">Your microphone is working great</div>
+              </div>
+            )}
+            {micTestState === 'failed' && (
+              <div className="text-orange-400">
+                <div className="text-sm font-medium">Try speaking a bit louder</div>
+                <div className="text-xs text-gray-400">We had trouble detecting your voice</div>
+              </div>
+            )}
+            {micTestState === 'idle' && (
+              <div className="text-gray-400 text-xs">
+                Test your microphone to make sure it's working properly
               </div>
             )}
           </div>
+
+          {/* Audio Visualizer (reusing existing component) */}
+          <div className="h-16 bg-gray-700 rounded-lg p-3">
+            <AudioVisualizer 
+              audioStream={streamRef.current || undefined}
+              isActive={isTestingMic}
+              className="rounded"
+            />
+          </div>
+
+          {/* Test Button */}
+          <Button
+            onClick={testMicrophone}
+            disabled={isLoadingDevices}
+            variant={isTestingMic ? "destructive" : "outline"}
+            className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+          >
+            <TestTube className="w-4 h-4 mr-2" />
+            {isTestingMic ? "Stop Test" : 
+             isLoadingDevices ? "Loading..." : 
+             "Test Microphone (5s)"}
+          </Button>
         </div>
       </CardContent>
     </Card>
