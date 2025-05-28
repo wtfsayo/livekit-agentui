@@ -340,7 +340,7 @@ function VoiceChatContent({ onDisconnect }: { onDisconnect: () => void }) {
 }
 
 export default function VoiceChatRoom({ token, roomName, onDisconnect }: VoiceChatRoomProps) {
-  const [wsURL] = useState(process.env.NEXT_PUBLIC_LIVEKIT_URL || "")
+  const [wsURL] = useState(import.meta.env.VITE_LIVEKIT_URL || "wss://lvie-fd0we5n9.livekit.cloud")
   const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "disconnected">("connecting")
   const [error, setError] = useState<string>("")
 

@@ -1,10 +1,10 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import VoiceChatRoom from "@/components/voice-chat-room"
 import VoiceOnboarding from "@/components/voice-onboarding"
 
-export default function VoiceChatPage() {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+
+export default function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [roomName, setRoomName] = useState("voice-agent-room")
   const [token, setToken] = useState("")
@@ -47,7 +47,7 @@ export default function VoiceChatPage() {
     
     // Auto-connect after onboarding
     try {
-      const response = await fetch("/api/livekit-token", {
+      const response = await fetch(`${API_BASE_URL}/api/livekit-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomName: data.roomName, participantName: data.participantName }),
@@ -78,7 +78,7 @@ export default function VoiceChatPage() {
     
     // Auto-connect with saved preferences
     try {
-      const response = await fetch("/api/livekit-token", {
+      const response = await fetch(`${API_BASE_URL}/api/livekit-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomName: savedRoom, participantName: savedName }),
