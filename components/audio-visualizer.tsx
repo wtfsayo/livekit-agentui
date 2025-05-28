@@ -16,9 +16,9 @@ export default function AudioVisualizer({
   className = "",
 }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
-  const analyserRef = useRef<AnalyserNode>()
-  const [audioData, setAudioData] = useState<Uint8Array>()
+  const animationRef = useRef<number | undefined>(undefined)
+  const analyserRef = useRef<AnalyserNode | undefined>(undefined)
+  const [audioData, setAudioData] = useState<Uint8Array | undefined>()
 
   useEffect(() => {
     if (!audioStream) return
@@ -59,8 +59,12 @@ export default function AudioVisualizer({
 
       analyserRef.current.getByteFrequencyData(audioData)
 
-      // Clear with dark background
-      ctx.fillStyle = "#374151"
+      // Clear with background using computed style
+      const computedStyle = getComputedStyle(canvas)
+      const mutedColor = `hsl(${computedStyle.getPropertyValue('--muted').trim()})`
+      const primaryColor = `hsl(${computedStyle.getPropertyValue('--primary').trim()})`
+      
+      ctx.fillStyle = mutedColor
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       const barWidth = canvas.width / barCount
@@ -69,10 +73,10 @@ export default function AudioVisualizer({
       for (let i = 0; i < barCount; i++) {
         const barHeight = (audioData[i] / 255) * canvas.height * 0.8
 
-        // Create gradient
+        // Simple gradient using primary color
         const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight)
-        gradient.addColorStop(0, "#3b82f6")
-        gradient.addColorStop(1, "#60a5fa")
+        gradient.addColorStop(0, primaryColor)
+        gradient.addColorStop(1, primaryColor.replace(')', ' / 0.5)'))
 
         ctx.fillStyle = gradient
         ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight)

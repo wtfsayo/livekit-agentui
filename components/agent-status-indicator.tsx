@@ -37,19 +37,19 @@ export default function AgentStatusIndicator({ isConnected, agentState }: AgentS
   const qualityText = getQualityText()
 
   const getConnectionIcon = () => {
-    if (!isConnected) return <WifiOff className="w-4 h-4 text-red-400" />
+    if (!isConnected) return <WifiOff className="w-4 h-4 text-destructive" />
 
     switch (qualityText) {
       case "excellent":
-        return <Wifi className="w-4 h-4 text-green-400" />
+        return <Wifi className="w-4 h-4 text-primary" />
       case "good":
-        return <Wifi className="w-4 h-4 text-yellow-400" />
+        return <Wifi className="w-4 h-4 text-primary" />
       case "poor":
-        return <AlertCircle className="w-4 h-4 text-orange-400" />
+        return <AlertCircle className="w-4 h-4 text-destructive" />
       case "lost":
-        return <WifiOff className="w-4 h-4 text-red-400" />
+        return <WifiOff className="w-4 h-4 text-destructive" />
       default:
-        return <Wifi className="w-4 h-4 text-gray-400" />
+        return <Wifi className="w-4 h-4 text-muted-foreground" />
     }
   }
 
@@ -59,36 +59,33 @@ export default function AgentStatusIndicator({ isConnected, agentState }: AgentS
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg text-white">
-          <Bot className="w-5 h-5 text-blue-400" />
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Bot className="w-5 h-5" />
           Connection Status
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-300">Network</span>
+          <span className="text-sm font-medium">Network</span>
           <div className="flex items-center gap-2">
             {getConnectionIcon()}
-            <span className="text-sm text-gray-300">{getConnectionText()}</span>
+            <span className="text-sm">{getConnectionText()}</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-300">Agent</span>
-          <Badge
-            variant={isConnected ? "default" : "secondary"}
-            className={isConnected ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-600 text-gray-300"}
-          >
+          <span className="text-sm font-medium">Agent</span>
+          <Badge variant={isConnected ? "default" : "secondary"}>
             {isConnected ? "Online" : "Offline"}
           </Badge>
         </div>
 
         {agentState && (
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-300">State</span>
-            <Badge variant="outline" className="border-gray-600 text-gray-300">
+            <span className="text-sm font-medium">State</span>
+            <Badge variant="outline">
               {agentState}
             </Badge>
           </div>
@@ -96,8 +93,8 @@ export default function AgentStatusIndicator({ isConnected, agentState }: AgentS
 
         {isConnected && roomInfo && (
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-300">Room</span>
-            <Badge variant="outline" className="border-gray-600 text-gray-300 font-mono text-xs">
+            <span className="text-sm font-medium">Room</span>
+            <Badge variant="outline" className="font-mono text-xs">
               {roomInfo.name}
             </Badge>
           </div>

@@ -84,11 +84,11 @@ export default function ConversationTranscript({ isRecording = false }: Conversa
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
-            <MessageSquare className="w-5 h-5 text-blue-400" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <MessageSquare className="w-5 h-5" />
             Conversation Transcript
           </CardTitle>
           <div className="flex gap-2">
@@ -97,7 +97,6 @@ export default function ConversationTranscript({ isRecording = false }: Conversa
               size="sm"
               onClick={downloadTranscript}
               disabled={messages.length === 0}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white disabled:text-gray-500"
             >
               <Download className="w-4 h-4" />
             </Button>
@@ -106,7 +105,6 @@ export default function ConversationTranscript({ isRecording = false }: Conversa
               size="sm"
               onClick={clearTranscript}
               disabled={messages.length === 0}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white disabled:text-gray-500"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -117,27 +115,27 @@ export default function ConversationTranscript({ isRecording = false }: Conversa
         <ScrollArea className="h-64 w-full" ref={scrollAreaRef}>
           <div className="space-y-3">
             {messages.length === 0 ? (
-              <div className="text-center text-gray-400 text-sm py-8">
+              <div className="text-center text-muted-foreground text-sm py-8">
                 {isRecording ? "Conversation will appear here..." : "Start a conversation to see transcript"}
               </div>
             ) : (
               messages.map((message) => (
                 <div key={message.id} className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                     {message.speaker === "user" ? (
-                      <User className="w-4 h-4 text-blue-400" />
+                      <User className="w-4 h-4" />
                     ) : (
-                      <Bot className="w-4 h-4 text-green-400" />
+                      <Bot className="w-4 h-4" />
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-white">
+                      <span className="font-medium text-sm">
                         {message.speaker === "user" ? "You" : "Agent"}
                       </span>
-                      <span className="text-xs text-gray-400">{message.timestamp.toLocaleTimeString()}</span>
+                      <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
                     </div>
-                    <p className="text-sm text-gray-300">{message.message}</p>
+                    <p className="text-sm">{message.message}</p>
                   </div>
                 </div>
               ))

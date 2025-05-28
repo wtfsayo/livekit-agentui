@@ -151,9 +151,9 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
   const outputDevices = devices.filter(device => device.kind === 'audiooutput' && device.deviceId)
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg text-white">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <User className="w-5 h-5" />
           Voice Controls
         </CardTitle>
@@ -166,7 +166,7 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
               variant={isMuted ? "destructive" : "outline"}
               size="lg"
               onClick={toggleMute}
-              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="flex flex-col gap-1 h-auto py-3"
             >
               {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               <span className="text-xs">{isMuted ? "Unmute" : "Mute"}</span>
@@ -176,7 +176,7 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
               variant={isAudioEnabled ? "outline" : "destructive"}
               size="lg"
               onClick={toggleAudio}
-              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="flex flex-col gap-1 h-auto py-3"
             >
               {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               <span className="text-xs">{isAudioEnabled ? "Audio On" : "Audio Off"}</span>
@@ -186,7 +186,7 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
               variant="outline"
               size="lg"
               onClick={() => setShowDeviceSettings(!showDeviceSettings)}
-              className="flex flex-col gap-1 h-auto py-3 border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="flex flex-col gap-1 h-auto py-3"
             >
               <Settings className="w-5 h-5" />
               <span className="text-xs">Devices</span>
@@ -200,28 +200,27 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
 
           {/* Device Settings */}
           {showDeviceSettings && (
-            <div className="space-y-3 p-3 bg-gray-700 rounded-lg">
-              <h4 className="text-sm font-medium text-white">Audio Devices</h4>
+            <div className="space-y-3 p-3 bg-muted rounded-lg">
+              <h4 className="text-sm font-medium">Audio Devices</h4>
               
               {/* Input Device Selection */}
               <div className="space-y-2">
-                <Label className="text-xs text-gray-300 flex items-center gap-2">
+                <Label className="text-xs flex items-center gap-2">
                   Microphone
                   {isSwitchingDevice && <Loader2 className="w-3 h-3 animate-spin" />}
                 </Label>
                 <Select value={selectedInputDevice} onValueChange={switchInputDevice} disabled={isSwitchingDevice}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white h-8 text-xs disabled:opacity-50">
+                  <SelectTrigger className="h-8 text-xs disabled:opacity-50">
                     <SelectValue placeholder="Select microphone" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    <SelectItem value="default" className="text-white hover:bg-gray-500">
+                  <SelectContent>
+                    <SelectItem value="default">
                       Default Microphone
                     </SelectItem>
                     {inputDevices.map((device) => (
                       <SelectItem
                         key={device.deviceId}
                         value={device.deviceId}
-                        className="text-white hover:bg-gray-500"
                       >
                         {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
                       </SelectItem>
@@ -232,20 +231,19 @@ function VoiceAssistantControls({ onDisconnect }: { onDisconnect: () => void }) 
 
               {/* Output Device Selection */}
               <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Speakers</Label>
+                <Label className="text-xs">Speakers</Label>
                 <Select value={selectedOutputDevice} onValueChange={switchOutputDevice}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white h-8 text-xs">
+                  <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Select speakers" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-600 border-gray-500">
-                    <SelectItem value="default" className="text-white hover:bg-gray-500">
+                  <SelectContent>
+                    <SelectItem value="default">
                       Default Speakers
                     </SelectItem>
                     {outputDevices.map((device) => (
                       <SelectItem
                         key={device.deviceId}
                         value={device.deviceId}
-                        className="text-white hover:bg-gray-500"
                       >
                         {device.label || `Speaker ${device.deviceId.slice(0, 8)}`}
                       </SelectItem>
@@ -265,35 +263,35 @@ function ParticipantsList() {
   const tracks = useTracks([Track.Source.Microphone], { onlySubscribed: false })
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-white">Participants</CardTitle>
+        <CardTitle className="text-lg">Participants</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
           {tracks.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-4">No participants connected yet</div>
+            <div className="text-center text-muted-foreground text-sm py-4">No participants connected yet</div>
           ) : (
             tracks.map((track) => (
-              <div key={track.participant.identity} className="flex items-center gap-3 p-2 bg-gray-700 rounded-lg">
-                <div className="w-8 h-8 bg-blue-900 rounded-full flex items-center justify-center">
+              <div key={track.participant.identity} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
+                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   {track.participant.identity.includes("agent") ? (
-                    <Bot className="w-4 h-4 text-blue-400" />
+                    <Bot className="w-4 h-4" />
                   ) : (
-                    <User className="w-4 h-4 text-blue-400" />
+                    <User className="w-4 h-4" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-sm text-white">
+                  <div className="font-medium text-sm">
                     {track.participant.identity.includes("agent") ? "AI Agent" : "You"}
                   </div>
-                  <div className="text-xs text-gray-400">{track.participant.identity}</div>
+                  <div className="text-xs text-muted-foreground">{track.participant.identity}</div>
                 </div>
                 <div className="flex items-center gap-1">
                   {track.publication?.isMuted ? (
-                    <MicOff className="w-4 h-4 text-red-400" />
+                    <MicOff className="w-4 h-4 text-destructive" />
                   ) : (
-                    <Mic className="w-4 h-4 text-green-400" />
+                    <Mic className="w-4 h-4 text-primary" />
                   )}
                 </div>
               </div>
@@ -318,9 +316,9 @@ function VoiceChatContent({ onDisconnect }: { onDisconnect: () => void }) {
         <AgentStatusIndicator isConnected={true} agentState={state} />
         <VoiceAssistantControls onDisconnect={onDisconnect} />
         {/* Audio Visualizer */}
-        <Card className="bg-gray-800 border-gray-700">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white">Audio Activity</CardTitle>
+            <CardTitle className="text-lg">Audio Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <AudioVisualizer 
@@ -348,9 +346,9 @@ export default function VoiceChatRoom({ token, roomName, onDisconnect }: VoiceCh
 
   if (!wsURL) {
     return (
-      <Card className="mb-6 bg-red-900/20 border-red-800">
+      <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="text-red-400 text-sm">
+          <div className="text-destructive text-sm">
             LiveKit server URL not configured. Please check your environment variables.
           </div>
         </CardContent>
@@ -361,25 +359,25 @@ export default function VoiceChatRoom({ token, roomName, onDisconnect }: VoiceCh
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-white mb-2">Voice Agent Chat</h1>
-        <p className="text-gray-400">
-          Connected to room: <span className="font-mono text-blue-400">{roomName}</span>
+        <h1 className="text-3xl font-bold mb-2">Voice Agent Chat</h1>
+        <p className="text-muted-foreground">
+          Connected to room: <span className="font-mono">{roomName}</span>
         </p>
       </div>
 
       {connectionState === "connecting" && (
-        <Card className="mb-6 bg-gray-800 border-gray-700">
+        <Card className="mb-6">
           <CardContent className="flex items-center gap-3 p-4">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-            <span className="text-gray-300">Connecting to voice chat...</span>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Connecting to voice chat...</span>
           </CardContent>
         </Card>
       )}
 
       {error && (
-        <Card className="mb-6 bg-red-900/20 border-red-800">
+        <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="text-red-400 text-sm">{error}</div>
+            <div className="text-destructive text-sm">{error}</div>
           </CardContent>
         </Card>
       )}

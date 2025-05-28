@@ -1,62 +1,119 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import VoiceChatRoom from "@/components/voice-chat-room"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Mic, Phone, Settings, Loader2 } from "lucide-react"
-import ConnectionTest from "@/components/connection-test"
-import VoiceSettings from "@/components/voice-settings"
-import QuickStartGuide from "@/components/quick-start-guide"
+import VoiceOnboarding from "@/components/voice-onboarding"
 
 export default function VoiceChatPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [roomName, setRoomName] = useState("voice-agent-room")
   const [token, setToken] = useState("")
-  const [participantName, setParticipantName] = useState("user-" + Math.random().toString(36).substring(2, 11))
-  const [isGeneratingToken, setIsGeneratingToken] = useState(false)
-  const [error, setError] = useState("")
-  const [showSettings, setShowSettings] = useState(false)
-  const [testPassed, setTestPassed] = useState(false)
+  const [participantName, setParticipantName] = useState("")
+  const [showOnboarding, setShowOnboarding] = useState(true)
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false)
 
-  const handleConnect = async () => {
-    if (!roomName || !participantName) return
-
-    setIsGeneratingToken(true)
-    setError("")
-
-    try {
-      const response = await fetch("/api/livekit-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomName, participantName }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to generate token")
-      }
-
-      setToken(data.token)
-      setIsConnected(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect")
-    } finally {
-      setIsGeneratingToken(false)
+  // Check if user has completed onboarding before
+  useEffect(() => {
+    const completedOnboarding = localStorage.getItem('voice-chat-onboarding-completed')
+    const savedName = localStorage.getItem('voice-chat-participant-name')
+    
+    if (completedOnboarding === 'true' && savedName) {
+      setHasCompletedOnboarding(true)
+      setParticipantName(savedName)
+      // Still show onboarding but with skip option for returning users
     }
-  }
+  }, [])
 
   const handleDisconnect = () => {
     setIsConnected(false)
     setToken("")
+    setShowOnboarding(true) // Return to onboarding when disconnecting
   }
 
+  const handleOnboardingComplete = async (data: {
+    participantName: string
+    roomName: string
+    inputDevice: string
+    outputDevice: string
+  }) => {
+    setParticipantName(data.participantName)
+    setRoomName(data.roomName)
+    setShowOnboarding(false)
+    
+    // Save onboarding completion and user preferences
+    localStorage.setItem('voice-chat-onboarding-completed', 'true')
+    localStorage.setItem('voice-chat-participant-name', data.participantName)
+    localStorage.setItem('voice-chat-room-name', data.roomName)
+    
+    // Auto-connect after onboarding
+    try {
+      const response = await fetch("/api/livekit-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName: data.roomName, participantName: data.participantName }),
+      })
+
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to generate token")
+      }
+
+      setToken(responseData.token)
+      setIsConnected(true)
+    } catch (err) {
+      console.error("Connection failed:", err)
+      // If connection fails, return to onboarding with error
+      setShowOnboarding(true)
+    }
+  }
+
+  const handleSkipOnboarding = async () => {
+    const savedName = localStorage.getItem('voice-chat-participant-name') || "user-" + Math.random().toString(36).substring(2, 8)
+    const savedRoom = localStorage.getItem('voice-chat-room-name') || "voice-agent-room"
+    
+    setParticipantName(savedName)
+    setRoomName(savedRoom)
+    setShowOnboarding(false)
+    
+    // Auto-connect with saved preferences
+    try {
+      const response = await fetch("/api/livekit-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName: savedRoom, participantName: savedName }),
+      })
+
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to generate token")
+      }
+
+      setToken(responseData.token)
+      setIsConnected(true)
+    } catch (err) {
+      console.error("Connection failed:", err)
+      // If connection fails, return to onboarding
+      setShowOnboarding(true)
+    }
+  }
+
+  // Show onboarding first
+  if (showOnboarding) {
+    return (
+      <VoiceOnboarding 
+        onComplete={handleOnboardingComplete}
+        showSkipOption={hasCompletedOnboarding}
+        onSkip={handleSkipOnboarding}
+      />
+    )
+  }
+
+  // Show voice chat room when connected
   if (isConnected) {
     return (
-      <div className="min-h-screen bg-gray-900 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-6xl mx-auto">
           <VoiceChatRoom token={token} roomName={roomName} onDisconnect={handleDisconnect} />
         </div>
@@ -64,88 +121,12 @@ export default function VoiceChatPage() {
     )
   }
 
+  // This shouldn't normally be reached, but just in case
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-gray-800 border-gray-700">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mb-4">
-            <Mic className="w-8 h-8 text-blue-400" />
-          </div>
-          <CardTitle className="text-2xl text-white">Voice Agent Chat</CardTitle>
-          <CardDescription className="text-gray-400">
-            Connect to start a voice conversation with an AI agent
-          </CardDescription>
-        </CardHeader>
-        {showSettings && (
-          <div className="space-y-4 mb-6 p-4">
-            <QuickStartGuide 
-              currentStep={
-                isConnected ? 4 : 
-                testPassed ? 3 : 
-                showSettings ? 2 : 1
-              } 
-            />
-            <ConnectionTest onTestComplete={setTestPassed} />
-            <VoiceSettings />
-          </div>
-        )}
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="participant-name" className="text-gray-300">
-                Your Name
-              </Label>
-              <Input
-                id="participant-name"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
-                placeholder="Enter your name"
-                className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="room-name" className="text-gray-300">
-                Room Name
-              </Label>
-              <Input
-                id="room-name"
-                value={roomName}
-                onChange={(e) => setRoomName(e.target.value)}
-                placeholder="Enter room name"
-                className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              />
-            </div>
-            {error && (
-              <div className="text-sm text-red-400 bg-red-900/20 p-2 rounded border border-red-800">{error}</div>
-            )}
-            <Button
-              onClick={() => setShowSettings(!showSettings)}
-              variant="outline"
-              className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              {showSettings ? "Hide" : "Show"} Settings
-            </Button>
-            <Button
-              onClick={handleConnect}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={!roomName || !participantName || isGeneratingToken}
-            >
-              {isGeneratingToken ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Phone className="w-4 h-4 mr-2" />
-                  Connect to Agent
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="text-center">
+        <p>Loading...</p>
+      </div>
     </div>
   )
 }

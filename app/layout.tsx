@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: 'Voice Agent Chat - AI-Powered Voice Conversations',
+  description: 'Connect and chat with an AI agent using real-time voice communication. Test your setup, configure audio devices, and enjoy natural voice conversations.',
+  generator: 'Next.js',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" >
       <body>{children}</body>
     </html>
   )
