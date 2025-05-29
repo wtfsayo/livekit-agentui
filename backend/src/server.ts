@@ -1,8 +1,8 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import healthRouter from './routes/health.js'
-import livekitRouter from './routes/livekit.js'
+import healthRouter from './routes/health'
+import livekitRouter from './routes/livekit'
 
 const app = express()
 const PORT = process.env.PORT || 3001
